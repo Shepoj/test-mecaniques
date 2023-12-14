@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    canvas {
+      border: 1px solid #000;
+      display: block;
+      margin: 20px auto;
+    }
+  </style>
+  <title>carre mobile avec cooldown et historique des positions</title>
+</head>
+<body>
+
+<canvas id="myCanvas" width="1200" height="600"></canvas>
+
+<script>
+  const canvas = document.getElementById('myCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const square = {
+    x: 50, // position horizontale du carre
+    y: 50, // position verticale du carre
+    size: 50, // taille du carre
+    speed: 4, // vitesse de deplacement du carre
+    dx: 0, // composante horizontale de la vitesse du carre
+    dy: 0, // composante verticale de la vitesse du carre
+    history: [], // liste pour stocker l'historique des positions
+    maxHistoryLength: 60, // 60 images par seconde pendant environ 10 secondes
+    lastTeleportTime: 0, // temps de la derniere teleportation
+    teleportCooldown: 1000, // 10 secondes en millisecondes
+    teleportHistory: [], // liste pour stocker les positions de teleportation
+    showTeleportSquare: false, // drapeau pour afficher le carre de teleportation
+    teleportSquareDuration: 10000, // duree en millisecondes pour afficher le carre de teleportation
+    teleportSquareStartTime: 0, // temps de debut d'affichage du carre de teleportation
+  };
+
+  function drawSquare(x, y, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, square.size, square.size);
+  }
+
+  function updateSquare() {
+    square.x += square.dx;
+    square.y += square.dy;
+
+    // assurer que le carre reste dans les limites du canvas
+    square.x = Math.max(0, Math.min(canvas.width - square.size, square.x));
+    square.y = Math.max(0, Math.min(canvas.height - square.size, square.y));
+
+    // enregistrer la position actuelle
+    const currentTime = Date.now();
+    square.history.push({ x: square.x, y: square.y, time: currentTime });
+
+    // supprimer les entrees plus anciennes si l'historique depasse la limite
+    if (square.history.length > square.maxHistoryLength) {
+      square.history.shift();
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // dessiner le carre bleu
+    drawSquare(square.x, square.y, '#00F');
+
+    // verifier si le carre de teleportation doit etre affiche
+    if (square.showTeleportSquare) {
+      const elapsedTeleportTime = Date.now() - square.teleportSquareStartTime;
+
+      // verifier si la duree du carre de teleportation n'est pas ecoulee
+      if (elapsedTeleportTime < square.teleportSquareDuration) {
+        // dessiner le carre vert a la position de teleportation
+        const firstTeleportPosition = square.teleportHistory[0];
+        const timeOffset = square.teleportSquareStartTime - firstTeleportPosition.time;
+        const currentTeleportIndex = Math.floor(elapsedTeleportTime / (1000 / 60)) + 1; // 60 images par seconde
+
+        // dessiner le carre vert a la position de teleportation actuelle
+        if (currentTeleportIndex < square.teleportHistory.length) {
+          const currentTeleportPosition = square.teleportHistory[currentTeleportIndex];
+          const adjustedX = firstTeleportPosition.x + (currentTeleportPosition.x - firstTeleportPosition.x);
+          const adjustedY = firstTeleportPosition.y + (currentTeleportPosition.y - firstTeleportPosition.y);
+          drawSquare(adjustedX, adjustedY, '#0F0');
+        }
+      } else {
+        // la duree du carre de teleportation est ecoulee, masquer le carre de teleportation
+        square.showTeleportSquare = false;
+      }
+    }
+  }
+
+  function moveSquare() {
+    updateSquare();
+    draw();
+    requestAnimationFrame(moveSquare);
+  }
+
+  function showTeleportSquare() {
+    square.showTeleportSquare = true;
+    square.teleportSquareStartTime = Date.now();
+  }
+
+  document.addEventListener('keydown', (event) => {
+    const key = event.key.toLowerCase();
+
+    if (key === ' ' && Date.now() - square.lastTeleportTime > square.teleportCooldown) {
+      // teleporter le carre a sa position d'il y a 10 secondes
+      const targetTime = Date.now() - 10000;
+      const point = square.history.find(entry => entry.time > targetTime);
+      if (point) {
+        square.x = point.x;
+        square.y = point.y;
+        square.lastTeleportTime = Date.now();
+
+        // stocker une copie des 60 dernieres positions dans teleportHistory
+        square.teleportHistory = square.history.slice(-square.maxHistoryLength);
+
+        // afficher le carre de teleportation
+        showTeleportSquare();
+      }
+    }
+
+    switch (key) {
+      case 'z':
+        square.dy = -square.speed;
+        break;
+      case 'q':
+        square.dx = -square.speed;
+        break;
+      case 's':
+        square.dy = square.speed;
+        break;
+      case 'd':
+        square.dx = square.speed;
+        break;
+    }
+  });
+
+  document.addEventListener('keyup', (event) => {
+    const key = event.key.toLowerCase();
+    switch (key) {
+      case 'z':
+      case 's':
+        square.dy = 0;
+        break;
+      case 'q':
+      case 'd':
+        square.dx = 0;
+        break;
+    }
+  });
+
+  moveSquare(); // demarrer la boucle d'animation
+
+</script>
+
+</body>
+</html>
